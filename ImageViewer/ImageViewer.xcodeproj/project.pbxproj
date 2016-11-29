@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F6ED250D1DDD2B420013F97D /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = F6ED250C1DDD2B420013F97D /* main.c */; };
+		F6FC17421DED31C7002BE9F1 /* ppm.c in Sources */ = {isa = PBXBuildFile; fileRef = F6FC17401DED31C7002BE9F1 /* ppm.c */; };
+		F6FC17441DED3303002BE9F1 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = F6FC17431DED3303002BE9F1 /* main.c */; };
+		F6FC17461DED353B002BE9F1 /* ezview.c in Sources */ = {isa = PBXBuildFile; fileRef = F6FC17451DED353B002BE9F1 /* ezview.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +26,15 @@
 
 /* Begin PBXFileReference section */
 		F6ED25091DDD2B420013F97D /* ImageViewer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ImageViewer; sourceTree = BUILT_PRODUCTS_DIR; };
-		F6ED250C1DDD2B420013F97D /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		F6FC17401DED31C7002BE9F1 /* ppm.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ppm.c; sourceTree = "<group>"; };
+		F6FC17411DED31C7002BE9F1 /* ppm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ppm.h; sourceTree = "<group>"; };
+		F6FC17431DED3303002BE9F1 /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		F6FC17451DED353B002BE9F1 /* ezview.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ezview.c; sourceTree = "<group>"; };
+		F6FC17481DED3998002BE9F1 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
+		F6FC174A1DED39A4002BE9F1 /* GLUT.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GLUT.framework; path = System/Library/Frameworks/GLUT.framework; sourceTree = SDKROOT; };
+		F6FC174D1DED4047002BE9F1 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
+		F6FC174F1DED405B002BE9F1 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		F6FC17511DED4066002BE9F1 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +53,7 @@
 			children = (
 				F6ED250B1DDD2B420013F97D /* ImageViewer */,
 				F6ED250A1DDD2B420013F97D /* Products */,
+				F6FC17471DED3998002BE9F1 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,9 +68,24 @@
 		F6ED250B1DDD2B420013F97D /* ImageViewer */ = {
 			isa = PBXGroup;
 			children = (
-				F6ED250C1DDD2B420013F97D /* main.c */,
+				F6FC17401DED31C7002BE9F1 /* ppm.c */,
+				F6FC17411DED31C7002BE9F1 /* ppm.h */,
+				F6FC17431DED3303002BE9F1 /* main.c */,
+				F6FC17451DED353B002BE9F1 /* ezview.c */,
 			);
 			path = ImageViewer;
+			sourceTree = "<group>";
+		};
+		F6FC17471DED3998002BE9F1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F6FC17511DED4066002BE9F1 /* CoreVideo.framework */,
+				F6FC174F1DED405B002BE9F1 /* IOKit.framework */,
+				F6FC174D1DED4047002BE9F1 /* Cocoa.framework */,
+				F6FC174A1DED39A4002BE9F1 /* GLUT.framework */,
+				F6FC17481DED3998002BE9F1 /* OpenGL.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,7 +145,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F6ED250D1DDD2B420013F97D /* main.c in Sources */,
+				F6FC17441DED3303002BE9F1 /* main.c in Sources */,
+				F6FC17421DED31C7002BE9F1 /* ppm.c in Sources */,
+				F6FC17461DED353B002BE9F1 /* ezview.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -246,6 +274,7 @@
 				F6ED25121DDD2B420013F97D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
