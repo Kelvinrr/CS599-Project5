@@ -6,8 +6,7 @@
 //  Copyright © 2016 jr2339. All rights reserved.
 //
 
-#define GLFW_DLL 1
-#define GL_GLEXT_PROTOTYPES
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,6 +17,7 @@
 #include <OpenGL/glu.h>
 #include <GLUT/glut.h>
 #include <GLFW/glfw3.h>
+
 typedef struct Image
 {
     int width;
@@ -264,57 +264,119 @@ void ImageWrite(Image *buffer, const char *filename,int format){
 
 /*=============================================================================*/
 GLFWwindow* window;
+
+/**
+ * Vertex Struct
+ */
 typedef struct {
     float position[3];
     float color[4];
-    float texcoord[2];
+    float texcords[2];
 } Vertex;
 
+/**
+ * A simple set of vertieces that define a square with correctly mapped texture cords
+ */
 const Vertex Vertices[] = {
-    {{1, -1, 0}, {1, 0, 0, 1}, {1,0}}, //Bottom Right
-    {{1, 1, 0}, {0, 1, 0, 1}, {1,1}},  //Top Right
-    {{-1, 1, 0}, {0, 0, 1, 1}, {0,1}}, //Top Left
-    {{-1, -1, 0}, {0, 0, 0, 1}, {0,0}} //Bottom Left
+    {{1, -1, 0}, {1, 1, 1, 1}, {1, 1}},
+    {{1, 1, 0}, {1, 1, 1, 1}, {1, 0}},
+    {{-1, 1, 0}, {1, 1, 1, 1}, {0, 0}},
+    {{-1, -1, 0}, {1, 1, 1, 1}, {0, 1}}
 };
 
+/**
+ * Specifies the connections between vertices
+ */
 const GLubyte Indices[] = {
     0, 1, 2,
     2, 3, 0
 };
 
-
+/**
+ * The vertex shader for the applciation, this is where almost all the
+ * action happens in reguards to transformations of the image. We simply
+ * pass values for Scale, Translation, Shear, and Rotation into here and
+ * the shader performs the appropriate matrix operations to transform the
+ * displayed underlying geometry.
+ */
 char* vertex_shader_src =
     "attribute vec4 Position;\n"
     "attribute vec4 SourceColor;\n"
-    "\n"
+    "attribute vec2 SourceTexcoord;\n"
+    "uniform vec2 Scale;\n"
+    "uniform vec2 Translation;"
+    "uniform vec2 Shear;\n"
+    "uniform float Rotation;\n"
     "varying vec4 DestinationColor;\n"
+    "varying vec2 DestinationTexcoord;\n"
+    "mat4 RotationMatrix = mat4( cos(Rotation), -sin(Rotation), 0.0, 0.0,\n"
+    "                            sin(Rotation),  cos(Rotation), 0.0, 0.0,\n"
+    "                            0.0,            0.0,           1.0, 0.0,\n"
+    "                            0.0,            0.0,           0.0, 1.0 );\n"
+    "\n"
+    "mat4 TranslationMatrix = mat4(1.0, 0.0, 0.0, Translation.x,\n"
+    "                              0.0, 1.0, 0.0, Translation.y,\n"
+    "                              0.0, 0.0, 1.0, 0.0,\n"
+    "                              0.0, 0.0, 0.0, 1.0 );\n"
+    "\n"
+    "mat4 ScaleMatrix = mat4(Scale.x, 0.0,     0.0, 0.0,\n"
+    "                        0.0,     Scale.y, 0.0, 0.0,\n"
+    "                        0.0,     0.0,     1.0, 0.0,\n"
+    "                        0.0,     0.0,     0.0, 1.0 );\n"
+    "\n"
+    "mat4 ShearMatrix = mat4(1.0,     Shear.x, 0.0, 0.0,\n"
+    "                        Shear.y, 1.0,     0.0, 0.0,\n"
+    "                        0.0,     0.0,     1.0, 0.0,\n"
+    "                        0.0,     0.0,     0.0, 1.0 );\n"
     "\n"
     "void main(void) {\n"
     "    DestinationColor = SourceColor;\n"
-    "    gl_Position = Position;\n"
-    "}\n";
+    "    DestinationTexcoord = SourceTexcoord;\n"
+    "    gl_Position = Position*ScaleMatrix*ShearMatrix*RotationMatrix*TranslationMatrix;\n"
+    "}";
 
 
+/**
+ * The fragment shader for the application. Handles actually mapping the
+ * input image onto the geometry.
+ */
 char* fragment_shader_src =
-    "varying lowp vec4 DestinationColor;\n"
+    "varying vec4 DestinationColor;\n"
+    "varying vec2 DestinationTexcoord;\n"
+    "uniform sampler2D Texture;\n"
     "\n"
     "void main(void) {\n"
-    "    gl_FragColor = DestinationColor;\n"
-    "}\n";
+    "    gl_FragColor = texture2D(Texture, DestinationTexcoord) * DestinationColor;\n"
+    "}";
 
-
-GLint simple_shader(GLint shader_type, const char* shader_src) {
-    
+/**
+ * Compile the specified shader, provides output and checks for errors
+ * along the way.
+ * @param shader_type - The OpenGL Shader Type
+ * @param shader_src - The shader in string form
+ * @return The compiled shader id
+ */
+GLint simple_shader(GLint shader_type, char* shader_src) {
     GLint compile_success = 0;
     
-    int shader_id = glCreateShader(shader_type);
+    // Generate a new shader to work with
+    GLuint shader_id = glCreateShader(shader_type);
     
+    // Tell the shader where the source is
     glShaderSource(shader_id, 1, &shader_src, 0);
     
+    // Print the shader before we compile it
+    printf("===Compiling Shader===\n");
+    printf("%s\n", shader_src);
+    printf("======================\n");
+    
+    // Actually compile the shader
     glCompileShader(shader_id);
     
+    // Check the status of the compile
     glGetShaderiv(shader_id, GL_COMPILE_STATUS, &compile_success);
     
+    // If it failed print an error
     if (compile_success == GL_FALSE) {
         GLchar message[256];
         glGetShaderInfoLog(shader_id, sizeof(message), 0, &message[0]);
@@ -325,22 +387,31 @@ GLint simple_shader(GLint shader_type, const char* shader_src) {
     return shader_id;
 }
 
-
+/**
+ * Start the OpenGL program, compile the shaders, and link the program
+ * @return
+ */
 int simple_program() {
     
     GLint link_success = 0;
     
+    // Generate a new program to work with
     GLint program_id = glCreateProgram();
+    // Compile the shaders
     GLint vertex_shader = simple_shader(GL_VERTEX_SHADER, vertex_shader_src);
     GLint fragment_shader = simple_shader(GL_FRAGMENT_SHADER, fragment_shader_src);
     
+    // Attach the shaders to the program
     glAttachShader(program_id, vertex_shader);
     glAttachShader(program_id, fragment_shader);
     
+    // Link the program
     glLinkProgram(program_id);
     
+    // Check the link status
     glGetProgramiv(program_id, GL_LINK_STATUS, &link_success);
     
+    // If it failed print an error
     if (link_success == GL_FALSE) {
         GLchar message[256];
         glGetProgramInfoLog(program_id, sizeof(message), 0, &message[0]);
@@ -356,46 +427,187 @@ static void error_callback(int error, const char* description) {
     fputs(description, stderr);
 }
 
+// Define variables to hold our current Scale, Shear, Translation, and Rotation states
+float ScaleTo[] = { 1.0, 1.0 };
+float Scale[] = { 1.0, 1.0 };
+float ShearTo[] = { 0.0, 0.0 };
+float Shear[] = { 0.0, 0.0 };
+float TranslationTo[] = { 0.0, 0.0 };
+float Translation[] = { 0, 0 };
+float RotationTo = 0;
+float Rotation = 0;
 
-int main(int argc, char *argv[]) {
-    /************************************************************************************************/
-    if(argc < 2){
-        perror("We need more arguments");
-        exit(1);//if the nunber is not 0, not access to error
-    }
-    else if(argc > 2){
-        perror("Too many arguments");
-        exit(1);//if the nunber is not 0, not access to error
-    }
-    const char *inputNmae = argv[1];  //input.ppm
-    Image *image;
-    image = ImageRead(inputNmae);
-     /************************************************************************************************/
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (action == GLFW_PRESS)
+        switch (key) {
+                // Scale up the whole image
+            case GLFW_KEY_UP:
+                ScaleTo[0] += 0.5;
+                ScaleTo[1] += 0.5;
+                break;
+                // Scale down the whole image
+            case GLFW_KEY_DOWN:
+                ScaleTo[0] -= 0.5;
+                ScaleTo[1] -= 0.5;
+                if (ScaleTo[0] < 0)
+                    ScaleTo[0] = 0;
+                if (ScaleTo[1] < 0)
+                    ScaleTo[1] = 0;
+                break;
+                // Scale up in the Y direction
+            case GLFW_KEY_T:
+                ScaleTo[1] += 0.5;
+                break;
+                // Scale down in the Y direction
+            case GLFW_KEY_G:
+                ScaleTo[1] -= 0.5;
+                if (ScaleTo[1] < 0)
+                    ScaleTo[1] = 0;
+                break;
+                // Scale up in the X direction
+            case GLFW_KEY_H:
+                ScaleTo[0] += 0.5;
+                break;
+                // Scale down in the X direction
+            case GLFW_KEY_F:
+                ScaleTo[0] -= 0.5;
+                if (ScaleTo[0] < 0)
+                    ScaleTo[0] = 0;
+                break;
+                // Translate down in the X direction
+            case GLFW_KEY_A:
+                TranslationTo[0] -= 0.5;
+                break;
+                // Translate up in the X direction
+            case GLFW_KEY_D:
+                TranslationTo[0] += 0.5;
+                break;
+                // Translate down in the Y direction
+            case GLFW_KEY_S:
+                TranslationTo[1] -= 0.5;
+                break;
+                // Translate up in the Y direction
+            case GLFW_KEY_W:
+                TranslationTo[1] += 0.5;
+                break;
+                // Add rotation
+            case GLFW_KEY_E:
+                RotationTo += 0.1;
+                break;
+                // Subtract rotation
+            case GLFW_KEY_Q:
+                RotationTo -= 0.1;
+                break;
+                // Shear up in the X direction
+            case GLFW_KEY_J:
+                ShearTo[0] += 0.1;
+                break;
+                // Shear down in the X direction
+            case GLFW_KEY_L:
+                ShearTo[0] -= 0.1;
+                break;
+                // Shear up in the Y direction
+            case GLFW_KEY_I:
+                ShearTo[1] += 0.1;
+                break;
+                // Shear down in the Y direction
+            case GLFW_KEY_K:
+                ShearTo[1] -= 0.1;
+                break;
+                // Reset all values to their original
+            case GLFW_KEY_R:
+                ScaleTo[0] = 1.0;
+                ScaleTo[1] = 1.0;
+                ShearTo[0] = 0.0;
+                ShearTo[1] = 0.0;
+                TranslationTo[0] = 0.0;
+                TranslationTo[1] = 0.0;
+                RotationTo = 0;
+                break;
+        }
+}
+
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    // Scale the image by some portion of the amount scrolled in the Y direction
+    ScaleTo[0] += yoffset * 0.5;
+    ScaleTo[1] += yoffset * 0.5;
     
+    if (ScaleTo[0] < 0)
+        ScaleTo[0] = 0;
+    if (ScaleTo[1] < 0)
+        ScaleTo[1] = 0;
+}
+
+
+void tween(float *currentValues, float *newValues, int totalEntries)
+{
+    for (totalEntries--; totalEntries >= 0; totalEntries--)
+        currentValues[totalEntries] += (newValues[totalEntries] - currentValues[totalEntries]) * 0.1;
+}
+
+/**
+ * The main enchilada, do all the things!
+ */
+int main (int argc, char *argv[]) {
+    // Check input arguments
+    if (argc != 2) {
+        fprintf(stderr, "Error: Not enough arguments provided\n");
+        //show_help();
+        return 1;
+    }
     
-    GLint program_id, position_slot, color_slot;
+    // Capture filename to load
+    char *inputFname = argv[1];
+    
+    // Attempt to load the specified image
+    //Image image;
+    /*
+    if (load_image(&image, inputFname) != 0) {
+        fprintf(stderr, "An error occurred loading the specified source file.\n");
+        exit(1);
+    }
+    */
+    // Define GLFW variables
+    GLint program_id;
+    GLuint color_slot;
+    GLuint position_slot;
+    GLuint texcoord_slot;
+    GLuint scale_slot;
+    GLuint translation_slot;
+    GLuint rotation_slot;
+    GLuint shear_slot;
     GLuint vertex_buffer;
     GLuint index_buffer;
+    GLuint tex;
     
+    // Set the GLFW error callback
     glfwSetErrorCallback(error_callback);
     
     // Initialize GLFW library
     if (!glfwInit())
         return -1;
     
+    // Setup GLFW window
     glfwDefaultWindowHints();
-    glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    
+    // Create a fancy window name that has the name of the file being displayed
+    char windowName[128];
+    snprintf(windowName, sizeof windowName, "ezview - '%s'", inputFname);
     
     // Create and open a window
     window = glfwCreateWindow(640,
                               480,
-                              "ezview",
+                              windowName,
                               NULL,
                               NULL);
     
+    // Make sure the window was created correctly
     if (!window) {
         glfwTerminate();
         printf("glfwCreateWindow Error\n");
@@ -408,10 +620,17 @@ int main(int argc, char *argv[]) {
     
     glUseProgram(program_id);
     
+    // Configure all the shader slots
     position_slot = glGetAttribLocation(program_id, "Position");
     color_slot = glGetAttribLocation(program_id, "SourceColor");
+    texcoord_slot = glGetAttribLocation(program_id, "SourceTexcoord");
+    scale_slot = glGetUniformLocation(program_id, "Scale");
+    translation_slot = glGetUniformLocation(program_id, "Translation");
+    rotation_slot = glGetUniformLocation(program_id, "Rotation");
+    shear_slot = glGetUniformLocation(program_id, "Shear");
     glEnableVertexAttribArray(position_slot);
     glEnableVertexAttribArray(color_slot);
+    glEnableVertexAttribArray(texcoord_slot);
     
     // Create Buffer
     glGenBuffers(1, &vertex_buffer);
@@ -426,28 +645,62 @@ int main(int argc, char *argv[]) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
     
+    int bufferWidth, bufferHeight;
+    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
+    
+    // Configure the texture
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_FLOAT, image.pixmap);
+    
+    glVertexAttribPointer(position_slot,
+                          3,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          sizeof(Vertex),
+                          0);
+    
+    glVertexAttribPointer(color_slot,
+                          4,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          sizeof(Vertex),
+                          (GLvoid*) (sizeof(float) * 3));
+    
+    glVertexAttribPointer(texcoord_slot,
+                          2,
+                          GL_FLOAT,
+                          GL_FALSE,
+                          sizeof(Vertex),
+                          (GLvoid*) (sizeof(float) * 7));
+    
+    // Setup callbacks for events
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    
     // Repeat
     while (!glfwWindowShouldClose(window)) {
         
-        glClearColor(0, 104.0/255.0, 55.0/255.0, 1.0);
+        // Tween values
+        tween(Scale, ScaleTo, 2);
+        tween(Translation, TranslationTo, 2);
+        tween(Shear, ShearTo, 2);
+        tween(&Rotation, &RotationTo, 1);
+        
+        // Send updated values to the shader
+        glUniform2f(scale_slot, Scale[0], Scale[1]);
+        glUniform2f(translation_slot, Translation[0], Translation[1]);
+        glUniform2f(shear_slot, Shear[0], Shear[1]);
+        glUniform1f(rotation_slot, Rotation);
+        
+        // Clear the screen
+        glClearColor(0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
         
-        glViewport(0, 0, 640, 480);
+        glViewport(0, 0, bufferWidth, bufferHeight);
         
-        glVertexAttribPointer(position_slot,
-                              3,
-                              GL_FLOAT,
-                              GL_FALSE,
-                              sizeof(Vertex),
-                              0);
-        
-        glVertexAttribPointer(color_slot,
-                              4,
-                              GL_FLOAT,
-                              GL_FALSE,
-                              sizeof(Vertex),
-                              (GLvoid*) (sizeof(float) * 3));
-        
+        // Draw everything
         glDrawElements(GL_TRIANGLES,
                        sizeof(Indices) / sizeof(GLubyte),
                        GL_UNSIGNED_BYTE, 0);
@@ -456,6 +709,7 @@ int main(int argc, char *argv[]) {
         glfwPollEvents();
     }
     
+    // Finished, close everything up
     glfwDestroyWindow(window);
     glfwTerminate();
     exit(EXIT_SUCCESS);
