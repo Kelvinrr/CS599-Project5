@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <sys/types.h>
 #include <string.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
