@@ -63,7 +63,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "P6.ppm  N6.ppm"
+            argument = "example.ppm"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

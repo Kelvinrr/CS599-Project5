@@ -1,585 +1,331 @@
-//
-//  main.c
-//  ImageView
-//
-//  Created by jr2339 on 11/29/16.
-//  Copyright © 2016 jr2339. All rights reserved.
-//
+#include <OpenGL/gl.h>
+#include <GLFW/glfw3.h>
+
+#include "linmath.h"
+
 #include <stdlib.h>
 #include <stdio.h>
-#include <ctype.h>
-#include <sys/types.h>
-#include <string.h>
+#include <assert.h>
 
-#include <GLFW/glfw3.h>
-//Code from project1 fix it only works for P6
-typedef struct RGBpixel {
-    int r, g, b;
-} RGBpixel;
-
-typedef struct Image{
-    int width;
-    int height;
-    int magic_number;
-    RGBpixel* pixmap;
-    int maxval;
-}Image;
-/*=======================================================================*/
-int readMagicNumber(FILE *fp);
-void skip_comments(FILE *f_source);
-Image *ImageRead(const char *filename);
-void readHeader(FILE *f_source, Image *buffer, int *source_width,int *source_height);
-void ImageWrite(Image *buffer, const char *filename);
-/*=====================================================================*/
-int readMagicNumber(FILE *fp) {
-    int magic_number;
-    if (!fscanf(fp, "P%d\n", &magic_number)){
-        fprintf(stderr,"file is not in PPM format, we can't read it");
-        exit(1);
-    }
-    return magic_number;
-}
-
-
-
-void skip_comments(FILE *f_source){
-    char ch;
-    /*skip the comments*/
-    ch = getc(f_source); // ch is int
-    /*
-     gets the next character (an unsigned char) from the specified
-     stream and advances the position indicator for the stream.
-     */
-    while(ch =='#'){
-        do{
-            ch=getc(f_source);
-        }
-        while(ch!='\n'); //read to the end of the line
-        ch=getc(f_source);
-    }
-    if(!isdigit(ch)){
-        fprintf(stderr,"can't read header information from PPM format\n");
-    }
-    else{
-        ungetc(ch, f_source); //put that digital back
-    }
-}
-
-void readHeader(FILE *f_source, Image *buffer, int *source_width,int *source_height){
-    
-    //int source_width,source_height,
-    int source_maxval;
-    skip_comments(f_source);
-    //read the width, height,amd maximum value for a pixel
-    fscanf(f_source, "%d %d %d ",source_width,source_height,&source_maxval);
-    
-    buffer->width = *source_width;
-    buffer->height = *source_height;
-    buffer->maxval = source_maxval;
-    
-    if(buffer->maxval >= 65336 ||buffer->maxval <= 0){
-        fprintf(stderr,"image is not ture-color(8byte), read failed\n");
-        exit(1);
-    }
-}
-
-Image *ImageRead(const char *filename){
-
-    FILE *f_source = fopen(filename,"r");
-    if(!f_source){
-        fprintf(stderr,"can't open file for reading \n");
-        exit(1);
-    }
-    
-    int source_width,source_height;
-    
-    Image *buffer = (Image *)malloc(sizeof(Image));
-    
-    if(!buffer){
-        fprintf(stderr,"Can't allocate memory for new image");
-        exit(1);
-    }
-    buffer->magic_number = readMagicNumber(f_source);
-    readHeader(f_source,buffer,&source_width,&source_height);
-    int size = source_width*source_height;
-    buffer->pixmap = (RGBpixel *)malloc(sizeof(RGBpixel)*size);
-    *buffer->pixmap = (RGBpixel){};
-    
-    if(buffer->magic_number==6){
-        unsigned char c ;//init
-        int index = 0;
-        while (index < size) {     //Dr.plamer tola me should be the origianl size of image
-            int x = index%source_width;  //col_index in buffer
-            int y = index/source_width; // row_index in buffer
-            fread(&c, 1, 1, f_source);
-            buffer->pixmap[y*buffer->width+x].r += c;
-            fread(&c, 1, 1, f_source);
-            buffer->pixmap[y*buffer->width+x].g += c;
-            fread(&c, 1, 1, f_source);
-            buffer->pixmap[y*buffer->width+x].b += c;
-
-            index += 1;
-        }
-        
-    }
-
-    return buffer;
-}
-void ImageWrite(Image *buffer, const char *filename){
-    int size = buffer->width * buffer->height;
-    //printf("buffer width is %d, buffer height is %d\n",buffer->width,buffer->height);
-    FILE *f_des = fopen(filename, "w");
-    if (!f_des){
-        fprintf(stderr,"cannot open file for writing");
-    }
-    unsigned char ch;
-    
-    fprintf(f_des, "P%d\n%d %d\n%d\n",6,buffer->width, buffer->height, buffer->maxval);
-    for(int i=0; i<size;i++){
-        ch=buffer->pixmap[i].r;
-        fwrite(&ch, 1, 1, f_des);
-        ch=buffer->pixmap[i].g;
-        fwrite(&ch, 1, 1, f_des);
-        ch=buffer->pixmap[i].b;
-        fwrite(&ch, 1, 1, f_des);
-    }
-    
-    fclose(f_des);
-    
-    
-}
-/*=============================================================================================*/
-/*==============================Using Dr.Plame's Code as Template=============================*/
-//GLFW Window
-GLFWwindow* window;
-
-//Vertex Struct
 typedef struct {
-    float position[3];
-    float color[4];
-    float texcords[2];
+  float Position[2];
+  float TexCoord[2];
 } Vertex;
 
-//A simple set of vertieces that define a square with correctly mapped texture cords
-const Vertex Vertices[] = {
-    {{1, -1, 0}, {1, 1, 1, 1}, {1, 1}},
-    {{1, 1, 0}, {1, 1, 1, 1}, {1, 0}},
-    {{-1, 1, 0}, {1, 1, 1, 1}, {0, 0}},
-    {{-1, -1, 0}, {1, 1, 1, 1}, {0, 1}}
+typedef struct {
+	unsigned char r, g, b;
+} Pixel;
+
+
+Vertex vertexes[] = {
+  {{1, -1}, {0.99999, 0.99999}},
+  {{1, 1},  {0.99999, 0}},
+  {{-1, 1}, {0, 0}}, 
+  {{-1, 1}, {0, 0}},
+  {{-1, -1}, {0, 0.99999}},
+  {{1, -1}, {0.99999, 0.99999}}
 };
 
-//Specifies the connections between vertices
-const GLubyte Indices[] = {
-    0, 1, 2,
-    2, 3, 0
-};
+const double pi = 3.1415926535897;
+float rotation = 0;
+float scale = 1;
+float translate_x = 0;
+float translate_y = 0;
+float shear_x = 0;
+float shear_y = 0;
 
+static const char* vertex_shader_text =
+    "uniform mat4 MVP;\n"
+    "attribute vec2 TexCoordIn;\n"
+    "attribute vec2 vPos;\n"
+    "varying vec2 TexCoordOut;\n"
+    "void main()\n"
+    "{\n"
+    "    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
+    "    TexCoordOut = TexCoordIn;\n"
+    "}\n";
 
-
-char* vertex_shader_src =
-    "attribute vec4 Position;\n"
-    "attribute vec4 SourceColor;\n"
-    "attribute vec2 SourceTexcoord;\n"
-    "uniform vec2 Scale;\n"
-    "uniform vec2 Translation;"
-    "uniform vec2 Shear;\n"
-    "uniform float Rotation;\n"
-    "varying vec4 DestinationColor;\n"
-    "varying vec2 DestinationTexcoord;\n"
-    "mat4 RotationMatrix = mat4( cos(Rotation), -sin(Rotation), 0.0, 0.0,\n"
-    "                            sin(Rotation),  cos(Rotation), 0.0, 0.0,\n"
-    "                            0.0,            0.0,           1.0, 0.0,\n"
-    "                            0.0,            0.0,           0.0, 1.0 );\n"
-    "\n"
-    "mat4 TranslationMatrix = mat4(1.0, 0.0, 0.0, Translation.x,\n"
-    "                              0.0, 1.0, 0.0, Translation.y,\n"
-    "                              0.0, 0.0, 1.0, 0.0,\n"
-    "                              0.0, 0.0, 0.0, 1.0 );\n"
-    "\n"
-    "mat4 ScaleMatrix = mat4(Scale.x, 0.0,     0.0, 0.0,\n"
-    "                        0.0,     Scale.y, 0.0, 0.0,\n"
-    "                        0.0,     0.0,     1.0, 0.0,\n"
-    "                        0.0,     0.0,     0.0, 1.0 );\n"
-    "\n"
-    "mat4 ShearMatrix = mat4(1.0,     Shear.x, 0.0, 0.0,\n"
-    "                        Shear.y, 1.0,     0.0, 0.0,\n"
-    "                        0.0,     0.0,     1.0, 0.0,\n"
-    "                        0.0,     0.0,     0.0, 1.0 );\n"
-    "\n"
-    "void main(void) {\n"
-    "    DestinationColor = SourceColor;\n"
-    "    DestinationTexcoord = SourceTexcoord;\n"
-    "    gl_Position = Position*ScaleMatrix*ShearMatrix*RotationMatrix*TranslationMatrix;\n"
-    "}";
-
-
-char* fragment_shader_src =
-    "varying vec4 DestinationColor;\n"
-    "varying vec2 DestinationTexcoord;\n"
+static const char* fragment_shader_text =
+    "varying lowp vec2 TexCoordOut;\n"
     "uniform sampler2D Texture;\n"
-    "\n"
-    "void main(void) {\n"
-    "    gl_FragColor = texture2D(Texture, DestinationTexcoord) * DestinationColor;\n"
-    "}";
+    "void main()\n"
+    "{\n"
+    "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
+    "}\n";
 
 
-GLint simple_shader(GLint shader_type, const char* shader_src) {
-    GLint compile_success = 0;
-    
-    // Generate a new shader to work with
-    GLuint shader_id = glCreateShader(shader_type);
-    
-    // Tell the shader where the source is
-    glShaderSource(shader_id, 1, &shader_src, 0);
-    
-    // Print the shader before we compile it
-    printf("===Compiling Shader===\n");
-    printf("%s\n", shader_src);
-    printf("======================\n");
-    
-    // Actually compile the shader
-    glCompileShader(shader_id);
-    
-    // Check the status of the compile
-    glGetShaderiv(shader_id, GL_COMPILE_STATUS, &compile_success);
-    
-    // If it failed print an error
-    if (compile_success == GL_FALSE) {
-        GLchar message[256];
-        glGetShaderInfoLog(shader_id, sizeof(message), 0, &message[0]);
-        printf("glCompileShader Error: %s\n", message);
-        exit(1);
-    }
-    
-    return shader_id;
-}
+void read_p3(Pixel *buffer, FILE *input_file, int width, int height);
 
+void read_p6(Pixel *buffer, FILE *input_file, int width, int height);
 
-int simple_program() {
-    
-    GLint link_success = 0;
-    
-    // Generate a new program to work with
-    GLint program_id = glCreateProgram();
-    // Compile the shaders
-    GLint vertex_shader = simple_shader(GL_VERTEX_SHADER, vertex_shader_src);
-    GLint fragment_shader = simple_shader(GL_FRAGMENT_SHADER, fragment_shader_src);
-    
-    // Attach the shaders to the program
-    glAttachShader(program_id, vertex_shader);
-    glAttachShader(program_id, fragment_shader);
-    
-    // Link the program
-    glLinkProgram(program_id);
-    
-    // Check the link status
-    glGetProgramiv(program_id, GL_LINK_STATUS, &link_success);
-    
-    // If it failed print an error
-    if (link_success == GL_FALSE) {
-        GLchar message[256];
-        glGetProgramInfoLog(program_id, sizeof(message), 0, &message[0]);
-        printf("glLinkProgram Error: %s\n", message);
-        exit(1);
-    }
-    
-    return program_id;
-}
-
-static void error_callback(int error, const char* description) {
-    fputs(description, stderr);
-}
-
-// Define variables to hold our current Scale, Shear, Translation, and Rotation states
-float ScaleTo[] = { 1.0, 1.0 };
-float Scale[] = { 1.0, 1.0 };
-float ShearTo[] = { 0.0, 0.0 };
-float Shear[] = { 0.0, 0.0 };
-float TranslationTo[] = { 0.0, 0.0 };
-float Translation[] = { 0, 0 };
-float RotationTo = 0;
-float Rotation = 0;
-
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void error_callback(int error, const char* description)
 {
-    if (action == GLFW_PRESS)
-        switch (key) {
-                // Scale up the whole image
-            case GLFW_KEY_UP:
-                ScaleTo[0] += 0.5;
-                ScaleTo[1] += 0.5;
-                break;
-                // Scale down the whole image
-            case GLFW_KEY_DOWN:
-                ScaleTo[0] -= 0.5;
-                ScaleTo[1] -= 0.5;
-                if (ScaleTo[0] < 0)
-                    ScaleTo[0] = 0;
-                if (ScaleTo[1] < 0)
-                    ScaleTo[1] = 0;
-                break;
-                // Scale up in the Y direction
-            case GLFW_KEY_T:
-                ScaleTo[1] += 0.5;
-                break;
-                // Scale down in the Y direction
-            case GLFW_KEY_G:
-                ScaleTo[1] -= 0.5;
-                if (ScaleTo[1] < 0)
-                    ScaleTo[1] = 0;
-                break;
-                // Scale up in the X direction
-            case GLFW_KEY_H:
-                ScaleTo[0] += 0.5;
-                break;
-                // Scale down in the X direction
-            case GLFW_KEY_F:
-                ScaleTo[0] -= 0.5;
-                if (ScaleTo[0] < 0)
-                    ScaleTo[0] = 0;
-                break;
-                // Translate down in the X direction
-            case GLFW_KEY_A:
-                TranslationTo[0] -= 0.5;
-                break;
-                // Translate up in the X direction
-            case GLFW_KEY_D:
-                TranslationTo[0] += 0.5;
-                break;
-                // Translate down in the Y direction
-            case GLFW_KEY_S:
-                TranslationTo[1] -= 0.5;
-                break;
-                // Translate up in the Y direction
-            case GLFW_KEY_W:
-                TranslationTo[1] += 0.5;
-                break;
-                // Add rotation
-            case GLFW_KEY_E:
-                RotationTo += 0.1;
-                break;
-                // Subtract rotation
-            case GLFW_KEY_Q:
-                RotationTo -= 0.1;
-                break;
-                // Shear up in the X direction
-            case GLFW_KEY_J:
-                ShearTo[0] += 0.1;
-                break;
-                // Shear down in the X direction
-            case GLFW_KEY_L:
-                ShearTo[0] -= 0.1;
-                break;
-                // Shear up in the Y direction
-            case GLFW_KEY_I:
-                ShearTo[1] += 0.1;
-                break;
-                // Shear down in the Y direction
-            case GLFW_KEY_K:
-                ShearTo[1] -= 0.1;
-                break;
-                // Reset all values to their original
-            case GLFW_KEY_R:
-                ScaleTo[0] = 1.0;
-                ScaleTo[1] = 1.0;
-                ShearTo[0] = 0.0;
-                ShearTo[1] = 0.0;
-                TranslationTo[0] = 0.0;
-                TranslationTo[1] = 0.0;
-                RotationTo = 0;
-                break;
-        }
+    fprintf(stderr, "Error: %s\n", description);
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    // Scale the image by some portion of the amount scrolled in the Y direction
-    ScaleTo[0] += yoffset * 0.5;
-    ScaleTo[1] += yoffset * 0.5;
-    
-    if (ScaleTo[0] < 0)
-        ScaleTo[0] = 0;
-    if (ScaleTo[1] < 0)
-        ScaleTo[1] = 0;
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    //Add keys for transformations here
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS) //ROTATE CCW
+    	rotation += 90*pi/180;
+    if (key == GLFW_KEY_E && action == GLFW_PRESS) //ROTATE CW
+    	rotation -= 90*pi/180;
+    if (key == GLFW_KEY_EQUAL && action == GLFW_PRESS)//
+    	scale *= 2;
+    if (key == GLFW_KEY_MINUS && action == GLFW_PRESS)
+    	scale *= .5;
+    if (key == GLFW_KEY_UP && action == GLFW_PRESS)  //Translate Up
+    	translate_y += .1;
+    if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) //Translate Down
+    	translate_y -= .1;
+    if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) //Translate Right
+    	translate_x += .1;
+    if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) //Translate Left
+    	translate_x -= .1;
+    if (key == GLFW_KEY_KP_6 && action == GLFW_PRESS) //Shear Up
+    	shear_y += .1;
+    if (key == GLFW_KEY_KP_4 && action == GLFW_PRESS) //Shear Down
+    	shear_y -= .1;
+    if (key == GLFW_KEY_KP_8 && action == GLFW_PRESS) //Shear Right
+    	shear_x += .1;
+    if (key == GLFW_KEY_KP_2 && action == GLFW_PRESS) //Shear Left
+    	shear_x -= .1;
+    //TODO: SCALE, SHEAR
 }
 
-void tween(float *currentValues, float *newValues, int totalEntries)
-{
-    for (totalEntries--; totalEntries >= 0; totalEntries--)
-        currentValues[totalEntries] += (newValues[totalEntries] - currentValues[totalEntries]) * 0.1;
+void glCompileShaderOrDie(GLuint shader) {
+  GLint compiled;
+  glCompileShader(shader);
+  glGetShaderiv(shader,
+		GL_COMPILE_STATUS,
+		&compiled);
+  if (!compiled) {
+    GLint infoLen = 0;
+    glGetShaderiv(shader,
+		  GL_INFO_LOG_LENGTH,
+		  &infoLen);
+    char* info = malloc(infoLen+1);
+    GLint done;
+    glGetShaderInfoLog(shader, infoLen, &done, info);
+    printf("Unable to compile shader: %s\n", info);
+    exit(1);
+  }
 }
 
-
-
-
-int main(int argc, const char * argv[]) {
-    if(argc < 3){
-        perror("We need more arguments");
-        exit(1);//if the nunber is not 0, not access to error
-    }
-    else if(argc > 3){
-        perror("Too many arguments");
-        exit(1);//if the nunber is not 0, not access to error
-    }
-    const char *inputName = argv[1];  //input.ppm
-
-    
-    Image image;
-    /*
-    if (load_image(&image, inputName) != 0) {
-        fprintf(stderr, "An error occurred loading the specified source file.\n");
-        exit(1);
-    }*/
-    // Define GLFW variables
-    GLint program_id;
-    GLuint color_slot;
-    GLuint position_slot;
-    GLuint texcoord_slot;
-    GLuint scale_slot;
-    GLuint translation_slot;
-    GLuint rotation_slot;
-    GLuint shear_slot;
-    GLuint vertex_buffer;
-    GLuint index_buffer;
-    GLuint tex;
-    
-    // Set the GLFW error callback
+int main(int argc, char *argv[]){
+    GLFWwindow* window;
+    GLuint vertex_buffer, vertex_shader, fragment_shader, program;
+    GLint mvp_location, vpos_location;
+    int image_width, image_height, max_color, read_character, original_format;
+    FILE *input_file;
+	Pixel *image;
     glfwSetErrorCallback(error_callback);
-    
-    // Initialize GLFW library
+
+	if(argc != 2){
+		fprintf(stderr, "ERROR: Incorrect number of arguments. Args given: %d\r\n", argc);
+		return EXIT_FAILURE;
+	}
+	input_file = fopen(argv[1], "r");
+	if(input_file == NULL){
+		fprintf(stderr, "ERROR: Failed to open input file.\r\n");
+		return EXIT_FAILURE;
+	}
+	//reading the image type (should be P3 or P6)
+	read_character = getc(input_file);
+	if(read_character != 'P'){
+		fprintf(stderr, "ERROR: Input file is not in PPM format.\r\n");
+	}
+	original_format = getc(input_file);
+	if(!(original_format != '6'|| original_format != '3')){
+		fprintf(stderr, "ERROR: Unsupported image type. Please provide a PPM image in either P3 or P6 format. Input given: %c.\r\n", original_format);
+	}
+	read_character = getc(input_file); //should get newline
+	read_character = getc(input_file);//should get either a comment character or number
+	//read and print out any comment in image to console
+	if (read_character == '#'){
+		while(read_character != '\n'){
+			read_character = getc(input_file);
+		}
+		printf("%c", read_character);
+	}
+	else{  //if there wasn't a comment, we want to go back one character so we're at the start of the line.
+		ungetc(read_character, input_file);
+	}
+	//get width, height, and max color value
+	fscanf(input_file, "%d %d\n%d\n", &image_width, &image_height, &max_color);
+	if(max_color >= 256){
+		fprintf(stderr, "ERROR: Multi-byte samples not supported.\r\n");
+		return EXIT_FAILURE;
+	}
+	//allocate memory for all the pixels
+	image = (Pixel *)malloc(image_width*image_height*sizeof(Pixel));
+	if(original_format == '3'){
+		read_p3(image, input_file, image_width, image_height);
+	}
+	else if(original_format == '6'){
+		read_p6(image, input_file, image_width, image_height);
+	}
+	else{
+		fprintf(stderr, "ERROR: Unknown format.");
+		return EXIT_FAILURE;
+	}
+	fclose(input_file);
+
     if (!glfwInit())
-        return -1;
-    
-    // Setup GLFW window
-    glfwDefaultWindowHints();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    
-    // Create a fancy window name that has the name of the file being displayed
-    char windowName[128];
-    snprintf(windowName, sizeof windowName, "ezview - '%s'", inputName);
-    
-    // Create and open a window
-    window = glfwCreateWindow(640,
-                              480,
-                              windowName,
-                              NULL,
-                              NULL);
-    
-    // Make sure the window was created correctly
-    if (!window) {
+        exit(EXIT_FAILURE);
+
+	glfwDefaultWindowHints();
+    //Plamer's code doesn't works in my computer
+    //How coudl I fix the code at here..........
+	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+   // =================================================
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+
+    window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+    if (!window)
+    {
         glfwTerminate();
-        printf("glfwCreateWindow Error\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-    
+
+    glfwSetKeyCallback(window, key_callback);
+
     glfwMakeContextCurrent(window);
-    
-    program_id = simple_program();
-    
-    glUseProgram(program_id);
-    
-    // Configure all the shader slots
-    position_slot = glGetAttribLocation(program_id, "Position");
-    color_slot = glGetAttribLocation(program_id, "SourceColor");
-    texcoord_slot = glGetAttribLocation(program_id, "SourceTexcoord");
-    scale_slot = glGetUniformLocation(program_id, "Scale");
-    translation_slot = glGetUniformLocation(program_id, "Translation");
-    rotation_slot = glGetUniformLocation(program_id, "Rotation");
-    shear_slot = glGetUniformLocation(program_id, "Shear");
-    glEnableVertexAttribArray(position_slot);
-    glEnableVertexAttribArray(color_slot);
-    glEnableVertexAttribArray(texcoord_slot);
-    
-    // Create Buffer
+    // gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    glfwSwapInterval(1);
+
+    // NOTE: OpenGL error checks have been omitted for brevity
+
     glGenBuffers(1, &vertex_buffer);
-    
-    // Map GL_ARRAY_BUFFER to this buffer
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertexes), vertexes, GL_STATIC_DRAW);
+
+    vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
+    glCompileShaderOrDie(vertex_shader);
+
+    fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
+    glCompileShaderOrDie(fragment_shader);
+
+    program = glCreateProgram();
+    glAttachShader(program, vertex_shader);
+    glAttachShader(program, fragment_shader);
+    glLinkProgram(program);
+    // more error checking! glLinkProgramOrDie!
+
+    mvp_location = glGetUniformLocation(program, "MVP");
+    assert(mvp_location != -1);
+
+    vpos_location = glGetAttribLocation(program, "vPos");
+    assert(vpos_location != -1);
+
+    GLint texcoord_location = glGetAttribLocation(program, "TexCoordIn");
+    assert(texcoord_location != -1);
+
+    GLint tex_location = glGetUniformLocation(program, "Texture");
+    assert(tex_location != -1);
+
+    glEnableVertexAttribArray(vpos_location);
+    glVertexAttribPointer(vpos_location,
+			  2,
+			  GL_FLOAT,
+			  GL_FALSE,
+                          sizeof(Vertex),
+			  (void*) 0);
+
+    glEnableVertexAttribArray(texcoord_location);
+    glVertexAttribPointer(texcoord_location,
+			  2,
+			  GL_FLOAT,
+			  GL_FALSE,
+                          sizeof(Vertex),
+			  (void*) (sizeof(float) * 2));
     
-    // Send the data
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertices), Vertices, GL_STATIC_DRAW);
-    
-    glGenBuffers(1, &index_buffer);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Indices), Indices, GL_STATIC_DRAW);
-    
-    int bufferWidth, bufferHeight;
-    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
-    
-    // Configure the texture
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
+    GLuint texID;
+    glGenTextures(1, &texID);
+    glBindTexture(GL_TEXTURE_2D, texID);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_FLOAT, image.pixmap);
-    
-    glVertexAttribPointer(position_slot,
-                          3,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          0);
-    
-    glVertexAttribPointer(color_slot,
-                          4,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          (GLvoid*) (sizeof(float) * 3));
-    
-    glVertexAttribPointer(texcoord_slot,
-                          2,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          (GLvoid*) (sizeof(float) * 7));
-    
-    // Setup callbacks for events
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-    
-    // Repeat
-    while (!glfwWindowShouldClose(window)) {
-        
-        // Tween values
-        tween(Scale, ScaleTo, 2);
-        tween(Translation, TranslationTo, 2);
-        tween(Shear, ShearTo, 2);
-        tween(&Rotation, &RotationTo, 1);
-        
-        // Send updated values to the shader
-        glUniform2f(scale_slot, Scale[0], Scale[1]);
-        glUniform2f(translation_slot, Translation[0], Translation[1]);
-        glUniform2f(shear_slot, Shear[0], Shear[1]);
-        glUniform1f(rotation_slot, Rotation);
-        
-        // Clear the screen
-        glClearColor(0, 0.0, 0.0, 1.0);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image_width, image_height, 0, GL_RGB,
+		 GL_UNSIGNED_BYTE, image);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texID);
+    glUniform1i(tex_location, 0);
+
+    while (!glfwWindowShouldClose(window))
+    {
+        float ratio;
+        int width, height;
+        mat4x4 r, h, s, t, rh, rhs, mvp; //matrices for each transformation and intermediate values
+
+        glfwGetFramebufferSize(window, &width, &height);
+        ratio = width / (float) height;
+
+        glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
-        
-        glViewport(0, 0, bufferWidth, bufferHeight);
-        
-        // Draw everything
-        glDrawElements(GL_TRIANGLES,
-                       sizeof(Indices) / sizeof(GLubyte),
-                       GL_UNSIGNED_BYTE, 0);
-        
+        //RHS T
+        mat4x4_identity(r);
+        mat4x4_rotate_Z(r, r, rotation); //angle of rotation
+
+        mat4x4_identity(h);
+        h[0][1] = shear_x;
+        h[1][0] = shear_y;
+
+        mat4x4_identity(s); //NOT WORKING AS INTENDED
+        s[0][0] = s[0][0]*scale;
+        s[1][1] = s[1][1]*scale;
+                
+        mat4x4_identity(t);	
+        mat4x4_translate(t, translate_x, translate_y, 0);
+
+        mat4x4_mul(rh, r, h); //R*H
+        mat4x4_mul(rhs, rh, s);//R*H*S
+        mat4x4_mul(mvp, rhs, t);//R*H*S*T
+
+        glUseProgram(program);
+        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
-    
-    // Finished, close everything up
+
     glfwDestroyWindow(window);
+
     glfwTerminate();
     exit(EXIT_SUCCESS);
-    return 0;
 }
 
+//! [code]
+void read_p3(Pixel *buffer, FILE *input_file, int width, int height){
+	//fgetc() and atoi() to read and convert ascii
+	int current_read;
+	int red, green, blue;
+	for(int i = 0; i < width*height; i++){
+		current_read = fgetc(input_file);
+		while(current_read  == ' ' || current_read  == '\n'){ //jumps to first character of first number
+			current_read = fgetc(input_file);
+		}
+		ungetc(current_read, input_file); //since we're now at the beginning of a number, go back one.
+		fscanf(input_file, "%d %d %d", &red, &green, &blue);
+		buffer[i].r = red;
+		buffer[i].g = green;
+		buffer[i].b = blue;
+	}	
+}
 
-
-
-
-
-
+void read_p6(Pixel *buffer, FILE *input_file, int width, int height){
+	//reading each pixel into memory for a P6 image
+	for(int i = 0; i < width*height; i++){
+		fread(&buffer[i].r, 1, 1, input_file);
+		fread(&buffer[i].g, 1, 1, input_file);
+		fread(&buffer[i].b, 1, 1, input_file);
+	}
+}
