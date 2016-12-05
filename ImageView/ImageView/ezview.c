@@ -2,7 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include "linmath.h"
-
+#include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -13,17 +13,16 @@ typedef struct {
 } Vertex;
 
 typedef struct {
-	unsigned char r, g, b;
-} Pixel;
-
+    unsigned char r, g, b;
+}Pixel;
 
 Vertex vertexes[] = {
-  {{1, -1}, {0.99999, 0.99999}},
-  {{1, 1},  {0.99999, 0}},
-  {{-1, 1}, {0, 0}}, 
-  {{-1, 1}, {0, 0}},
-  {{-1, -1}, {0, 0.99999}},
-  {{1, -1}, {0.99999, 0.99999}}
+    {{1, -1}, {0.99999, 0.99999}},
+    {{1, 1},  {0.99999, 0}},
+    {{-1, 1}, {0, 0}},
+    {{-1, 1}, {0, 0}},
+    {{-1, -1}, {0, 0.99999}},
+    {{1, -1}, {0.99999, 0.99999}}
 };
 
 const double pi = 3.1415926535897;
@@ -46,17 +45,16 @@ static const char* vertex_shader_text =
     "}\n";
 
 static const char* fragment_shader_text =
-    "varying lowp vec2 TexCoordOut;\n"
+    "varying vec2 TexCoordOut;\n"
     "uniform sampler2D Texture;\n"
     "void main()\n"
     "{\n"
     "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
     "}\n";
-
-
+/*===============================================================*/
 void read_p3(Pixel *buffer, FILE *input_file, int width, int height);
-
 void read_p6(Pixel *buffer, FILE *input_file, int width, int height);
+/*===============================================================*/
 
 static void error_callback(int error, const char* description)
 {
@@ -69,29 +67,29 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         glfwSetWindowShouldClose(window, GLFW_TRUE);
     //Add keys for transformations here
     if (key == GLFW_KEY_Q && action == GLFW_PRESS) //ROTATE CCW
-    	rotation += 90*pi/180;
+        rotation += 90*pi/180;
     if (key == GLFW_KEY_E && action == GLFW_PRESS) //ROTATE CW
-    	rotation -= 90*pi/180;
+        rotation -= 90*pi/180;
     if (key == GLFW_KEY_EQUAL && action == GLFW_PRESS)//
-    	scale *= 2;
+        scale *= 2;
     if (key == GLFW_KEY_MINUS && action == GLFW_PRESS)
-    	scale *= .5;
+        scale *= .5;
     if (key == GLFW_KEY_UP && action == GLFW_PRESS)  //Translate Up
-    	translate_y += .1;
+        translate_y += .1;
     if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) //Translate Down
-    	translate_y -= .1;
+        translate_y -= .1;
     if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) //Translate Right
-    	translate_x += .1;
+        translate_x += .1;
     if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) //Translate Left
-    	translate_x -= .1;
+        translate_x -= .1;
     if (key == GLFW_KEY_KP_6 && action == GLFW_PRESS) //Shear Up
-    	shear_y += .1;
+        shear_y += .1;
     if (key == GLFW_KEY_KP_4 && action == GLFW_PRESS) //Shear Down
-    	shear_y -= .1;
+        shear_y -= .1;
     if (key == GLFW_KEY_KP_8 && action == GLFW_PRESS) //Shear Right
-    	shear_x += .1;
+        shear_x += .1;
     if (key == GLFW_KEY_KP_2 && action == GLFW_PRESS) //Shear Left
-    	shear_x -= .1;
+        shear_x -= .1;
     //TODO: SCALE, SHEAR
 }
 
@@ -114,76 +112,94 @@ void glCompileShaderOrDie(GLuint shader) {
   }
 }
 
-int main(int argc, char *argv[]){
+/*
+unsigned char image[] = {
+  255, 0, 0, 255,
+  255, 0, 0, 255,
+  255, 0, 0, 255,
+  255, 0, 0, 255,
+
+  0, 255, 0, 255,
+  0, 255, 0, 255,
+  0, 255, 0, 255,
+  0, 255, 0, 255,
+
+  0, 0, 255, 255,
+  0, 0, 255, 255,
+  0, 0, 255, 255,
+  0, 0, 255, 255,
+
+  255, 0, 255, 255,
+  255, 0, 255, 255,
+  255, 0, 255, 255,
+  255, 0, 255, 255
+};
+*/
+int main(int argc, char *argv[])
+{
     GLFWwindow* window;
     GLuint vertex_buffer, vertex_shader, fragment_shader, program;
     GLint mvp_location, vpos_location;
-    int image_width, image_height, max_color, read_character, original_format;
-    FILE *input_file;
-	Pixel *image;
+    /*=======================================================================*/
+     int image_width, image_height, max_color, image_type, image_format;
+     FILE *input_file;
+     Pixel *image;
+    /*=======================================================================*/
     glfwSetErrorCallback(error_callback);
-
-	if(argc != 2){
-		fprintf(stderr, "ERROR: Incorrect number of arguments. Args given: %d\r\n", argc);
-		return EXIT_FAILURE;
-	}
-	input_file = fopen(argv[1], "r");
-	if(input_file == NULL){
-		fprintf(stderr, "ERROR: Failed to open input file.\r\n");
-		return EXIT_FAILURE;
-	}
-	//reading the image type (should be P3 or P6)
-	read_character = getc(input_file);
-	if(read_character != 'P'){
-		fprintf(stderr, "ERROR: Input file is not in PPM format.\r\n");
-	}
-	original_format = getc(input_file);
-	if(!(original_format != '6'|| original_format != '3')){
-		fprintf(stderr, "ERROR: Unsupported image type. Please provide a PPM image in either P3 or P6 format. Input given: %c.\r\n", original_format);
-	}
-	read_character = getc(input_file); //should get newline
-	read_character = getc(input_file);//should get either a comment character or number
-	//read and print out any comment in image to console
-	if (read_character == '#'){
-		while(read_character != '\n'){
-			read_character = getc(input_file);
-		}
-		printf("%c", read_character);
-	}
-	else{  //if there wasn't a comment, we want to go back one character so we're at the start of the line.
-		ungetc(read_character, input_file);
-	}
-	//get width, height, and max color value
-	fscanf(input_file, "%d %d\n%d\n", &image_width, &image_height, &max_color);
-	if(max_color >= 256){
-		fprintf(stderr, "ERROR: Multi-byte samples not supported.\r\n");
-		return EXIT_FAILURE;
-	}
-	//allocate memory for all the pixels
-	image = (Pixel *)malloc(image_width*image_height*sizeof(Pixel));
-	if(original_format == '3'){
-		read_p3(image, input_file, image_width, image_height);
-	}
-	else if(original_format == '6'){
-		read_p6(image, input_file, image_width, image_height);
-	}
-	else{
-		fprintf(stderr, "ERROR: Unknown format.");
-		return EXIT_FAILURE;
-	}
-	fclose(input_file);
-
+    /*=======================================================================*/
+    if (argc !=2) {
+        fprintf(stderr, "ERROR: Incorrect number of arguments.");
+        exit(1);
+    }
+    input_file = fopen(argv[1], "r");
+    if(input_file == NULL){
+        fprintf(stderr, "ERROR: Failed to open input file.\r\n");
+        return EXIT_FAILURE;
+    }
+    //Check the type of the image
+    image_type = getc(input_file);
+    if(image_type != 'P'){
+        fprintf(stderr, "ERROR: Input file is not in PPM format.\r\n");
+    }
+    image_format = getc(input_file);
+    if(!(image_format != '6'|| image_format != '3')){
+        fprintf(stderr, "ERROR: Unsupported image type. Please provide a PPM image in either P3 or P6 format. Input given: %c.\r\n", image_format);
+    }
+    image_type = getc(input_file); //should get newline
+    image_type = getc(input_file);//should get either a comment character or number
+    if (image_type == '#'){
+        while(image_type != '\n'){
+            image_type = getc(input_file);
+        }
+        printf("%c", image_type);
+    }
+    else{  //if there wasn't a comment, we want to go back one character so we're at the start of the line.
+        ungetc(image_type, input_file);
+    }
+    //get width, height, and max color value
+    fscanf(input_file, "%d %d\n%d\n", &image_width, &image_height, &max_color);
+    if(max_color >= 256){
+        fprintf(stderr, "ERROR: Multi-byte samples not supported.\r\n");
+        return EXIT_FAILURE;
+    }
+    //allocate memory for all the pixels
+    image = (Pixel *)malloc(image_width*image_height*sizeof(Pixel));
+    if(image_format == '3'){
+        read_p3(image, input_file, image_width, image_height);
+    }
+    else if(image_format == '6'){
+        read_p6(image, input_file, image_width, image_height);
+    }
+    else{
+        fprintf(stderr, "ERROR: Unknown format.");
+        return EXIT_FAILURE;
+    }
+    fclose(input_file);
+    /*=======================================================================*/
     if (!glfwInit())
         exit(EXIT_FAILURE);
-
-	glfwDefaultWindowHints();
-    //Plamer's code doesn't works in my computer
-    //How coudl I fix the code at here..........
-	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_EGL_CONTEXT_API);
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
-   // =================================================
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
     window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
     if (!window)
@@ -263,6 +279,7 @@ int main(int argc, char *argv[]){
     {
         float ratio;
         int width, height;
+        //mat4x4 m, p, mvp;
         mat4x4 r, h, s, t, rh, rhs, mvp; //matrices for each transformation and intermediate values
 
         glfwGetFramebufferSize(window, &width, &height);
@@ -270,25 +287,32 @@ int main(int argc, char *argv[]){
 
         glViewport(0, 0, width, height);
         glClear(GL_COLOR_BUFFER_BIT);
+        /*
+        mat4x4_identity(m);
+        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
+        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        mat4x4_mul(mvp, p, m);
+        */
+        /*=================================================*/
         //RHS T
         mat4x4_identity(r);
         mat4x4_rotate_Z(r, r, rotation); //angle of rotation
-
         mat4x4_identity(h);
         h[0][1] = shear_x;
         h[1][0] = shear_y;
-
+        
         mat4x4_identity(s); //NOT WORKING AS INTENDED
         s[0][0] = s[0][0]*scale;
         s[1][1] = s[1][1]*scale;
-                
-        mat4x4_identity(t);	
+        
+        mat4x4_identity(t);
         mat4x4_translate(t, translate_x, translate_y, 0);
-
+        
         mat4x4_mul(rh, r, h); //R*H
         mat4x4_mul(rhs, rh, s);//R*H*S
         mat4x4_mul(mvp, rhs, t);//R*H*S*T
 
+        /*=================================================*/
         glUseProgram(program);
         glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
         glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -303,29 +327,30 @@ int main(int argc, char *argv[]){
     exit(EXIT_SUCCESS);
 }
 
-//! [code]
+//! [code]=================================================================================//
 void read_p3(Pixel *buffer, FILE *input_file, int width, int height){
-	//fgetc() and atoi() to read and convert ascii
-	int current_read;
-	int red, green, blue;
-	for(int i = 0; i < width*height; i++){
-		current_read = fgetc(input_file);
-		while(current_read  == ' ' || current_read  == '\n'){ //jumps to first character of first number
-			current_read = fgetc(input_file);
-		}
-		ungetc(current_read, input_file); //since we're now at the beginning of a number, go back one.
-		fscanf(input_file, "%d %d %d", &red, &green, &blue);
-		buffer[i].r = red;
-		buffer[i].g = green;
-		buffer[i].b = blue;
-	}	
+    //fgetc() and atoi() to read and convert ascii
+    int current_read;
+    int red, green, blue;
+    for(int i = 0; i < width*height; i++){
+        current_read = fgetc(input_file);
+        while(current_read  == ' ' || current_read  == '\n'){ //jumps to first character of first number
+            current_read = fgetc(input_file);
+        }
+        ungetc(current_read, input_file); //since we're now at the beginning of a number, go back one.
+        fscanf(input_file, "%d %d %d", &red, &green, &blue);
+        buffer[i].r = red;
+        buffer[i].g = green;
+        buffer[i].b = blue;
+    }
 }
 
 void read_p6(Pixel *buffer, FILE *input_file, int width, int height){
-	//reading each pixel into memory for a P6 image
-	for(int i = 0; i < width*height; i++){
-		fread(&buffer[i].r, 1, 1, input_file);
-		fread(&buffer[i].g, 1, 1, input_file);
-		fread(&buffer[i].b, 1, 1, input_file);
-	}
+    //reading each pixel into memory for a P6 image
+    for(int i = 0; i < width*height; i++){
+        fread(&buffer[i].r, 1, 1, input_file);
+        fread(&buffer[i].g, 1, 1, input_file);
+        fread(&buffer[i].b, 1, 1, input_file);
+    }
 }
+
