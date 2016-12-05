@@ -5,38 +5,32 @@
 //  Created by jr2339 on 11/29/16.
 //  Copyright © 2016 jr2339. All rights reserved.
 //
-
-
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <string.h>
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
-#include <GLUT/glut.h>
-#include <GLFW/glfw3.h>
 
-typedef struct Image
-{
+#include <GLFW/glfw3.h>
+//Code from project1 fix it only works for P6
+typedef struct RGBpixel {
+    int r, g, b;
+} RGBpixel;
+
+typedef struct Image{
     int width;
     int height;
-    u_char *data; // color
     int magic_number;
-    int depth;
-    char *tupltype;
+    RGBpixel* pixmap;
     int maxval;
 }Image;
-
-/*=============================================================================*/
-Image *ImageCreate(int width, int height,int magic_number);
-Image *readPPMHeader(FILE *f_source, Image *image);
-Image *readPAMHeader(FILE *f_source, Image *image);
+/*=======================================================================*/
+int readMagicNumber(FILE *fp);
+void skip_comments(FILE *f_source);
 Image *ImageRead(const char *filename);
-void ImageWrite(Image *image, const char *filename,int format);
-/*=============================================================================*/
-
+void readHeader(FILE *f_source, Image *buffer, int *source_width,int *source_height);
+void ImageWrite(Image *buffer, const char *filename);
+/*=====================================================================*/
 int readMagicNumber(FILE *fp) {
     int magic_number;
     if (!fscanf(fp, "P%d\n", &magic_number)){
@@ -45,10 +39,10 @@ int readMagicNumber(FILE *fp) {
     }
     return magic_number;
 }
-/**************************************************************************************************************
- **************************************************************************************************************/
-// readPPMHeader help us to detemine which format is our source image
-Image *readPPMHeader(FILE *f_source, Image *buffer){
+
+
+
+void skip_comments(FILE *f_source){
     char ch;
     /*skip the comments*/
     ch = getc(f_source); // ch is int
@@ -69,214 +63,104 @@ Image *readPPMHeader(FILE *f_source, Image *buffer){
     else{
         ungetc(ch, f_source); //put that digital back
     }
+}
+
+void readHeader(FILE *f_source, Image *buffer, int *source_width,int *source_height){
     
-    /*default tupletype and depth for P3 is RGB and 3*/
-    buffer->tupltype = "RGB";
-    buffer->depth = 3;
+    //int source_width,source_height,
+    int source_maxval;
+    skip_comments(f_source);
     //read the width, height,amd maximum value for a pixel
-    fscanf(f_source, "%d %d %d\n",&buffer->width,&buffer->height,&buffer->maxval);
-    buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);// G, R, B three colors
+    fscanf(f_source, "%d %d %d ",source_width,source_height,&source_maxval);
+    
+    buffer->width = *source_width;
+    buffer->height = *source_height;
+    buffer->maxval = source_maxval;
+    
     if(buffer->maxval >= 65336 ||buffer->maxval <= 0){
         fprintf(stderr,"image is not ture-color(8byte), read failed\n");
         exit(1);
     }
-    return buffer;
-    
 }
-/**************************************************************************************************************
- **************************************************************************************************************/
-Image *readPAMHeadr(FILE *f_source, Image *buffer){
-    char array1[1024];
-    int array2;
-    char array3[1024];
-    while(1){
-        fscanf(f_source, "%s", array1);
-        if(strcmp(array1, "ENDHDR") == 0){   // we read the whole header
-            buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);// G, R, B three colors
-            return buffer;
-        }else if(strcmp(array1, "TUPLTYPE") == 0){ // if it is tupltype, we put value to it
-            fscanf(f_source, "%s", array3);
-            buffer->tupltype = array3;
-        }
-        else{
-            fscanf(f_source, "%d", &array2);      // read width, height and depth , maxvalue at here
-            if(strcmp(array1, "WIDTH") == 0){
-                buffer->width = array2;
-            }else if(strcmp(array1, "HEIGHT") == 0){
-                buffer->height = array2;
-            }else if(strcmp(array1, "DEPTH") == 0){
-                buffer->depth = array2;
-            }else if(strcmp(array1, "MAXVAL") == 0){
-                buffer->maxval = array2;
-            }
-        }
-    }
-    
-}
-/**************************************************************************************************************
- **************************************************************************************************************/
+
 Image *ImageRead(const char *filename){
-    FILE *fp = fopen(filename,"r");
-    if(!fp){
+
+    FILE *f_source = fopen(filename,"r");
+    if(!f_source){
         fprintf(stderr,"can't open file for reading \n");
         exit(1);
     }
+    
+    int source_width,source_height;
+    
     Image *buffer = (Image *)malloc(sizeof(Image));
+    
     if(!buffer){
         fprintf(stderr,"Can't allocate memory for new image");
         exit(1);
     }
-    buffer->magic_number = readMagicNumber(fp);
-    buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);// G, R, B three colors and A
-    if(buffer->magic_number==3){
-        readPPMHeader(fp,buffer);
-        buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);
-        int i,j, pixel[4];
-        //In P3 file, we use nested loop, to copy image content to buffer
-        for(i=0;i<buffer->height;i++){
-            for(j=0;j<buffer->width;j++){
-                fscanf(fp, "%d\n",pixel);
-                buffer->data[i*buffer->width*4+4*j] = *pixel;//R
-                fscanf(fp, "%d\n",pixel);
-                buffer->data[i*buffer->width*4+4*j+1] = *pixel;//G
-                fscanf(fp, "%d\n",pixel);
-                buffer->data[i*buffer->width*4+4*j+2] = *pixel;//B
-                buffer->data[i*buffer->width*4+4*j+3] = 255;  //A at here default value is 255
-            }
-        }
-    }
-    else if(buffer->magic_number==6){
-        readPPMHeader(fp,buffer);
-        buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);
-        int size1 = buffer->width * buffer->height*4;
-        int PPM_size = buffer->height*buffer->width*3;//give the times for our for loop
-        char c='A';//init
-        int k=0;
-        // for each llop we copy R, G, B to the buffer and let A =255
-        for(int m=0;m<PPM_size;m+=3){
-            fread(&c, 1, 1, fp);
-            buffer->data[k] = c;
-            k += 1;
-            fread(&c, 1, 1, fp);
-            buffer->data[k] = c;
-            k += 1;
-            fread(&c, 1, 1, fp);
-            buffer->data[k] = c;
-            k += 1;
-            buffer->data[k] = 255;
-            k += 1;
-        }
-        
-        if (k!= size1) {
-            printf("n is %d, size is %d \n",k,size1);
-            fprintf(stderr,"cannot read image datat from file \n");
-            exit(1);
+    buffer->magic_number = readMagicNumber(f_source);
+    readHeader(f_source,buffer,&source_width,&source_height);
+    int size = source_width*source_height;
+    buffer->pixmap = (RGBpixel *)malloc(sizeof(RGBpixel)*size);
+    *buffer->pixmap = (RGBpixel){};
+    
+    if(buffer->magic_number==6){
+        unsigned char c ;//init
+        int index = 0;
+        while (index < size) {     //Dr.plamer tola me should be the origianl size of image
+            int x = index%source_width;  //col_index in buffer
+            int y = index/source_width; // row_index in buffer
+            fread(&c, 1, 1, f_source);
+            buffer->pixmap[y*buffer->width+x].r += c;
+            fread(&c, 1, 1, f_source);
+            buffer->pixmap[y*buffer->width+x].g += c;
+            fread(&c, 1, 1, f_source);
+            buffer->pixmap[y*buffer->width+x].b += c;
+
+            index += 1;
         }
         
     }
-    else if(buffer->magic_number == 7){
-        size_t num2;
-        readPAMHeadr(fp,buffer);
-        buffer->data = (u_char *)malloc(buffer->width*buffer->height*4);
-        char ch = getc(fp); // ch is int
-        if (ch != '\n') {
-            ungetc(ch, fp); //put that char back
-        }
-        int size2 = buffer->width * buffer->height*4;
-        if (strcmp(buffer->tupltype, "RGB_ALPHA") == 0){
-            num2 = fread((void *) buffer->data, 1, (size_t) size2, fp);
-            if (num2 != size2) {
-                fprintf(stderr,"cannot read image datat from file \n");
-                exit(1);
-            }
-            
-        }else if (strcmp(buffer->tupltype, "RGB")==0){
-            int size3 = buffer->height*buffer->width*3;
-            char c='A';//init
-            int k=0;    // each time k incrsement 3
-            for(int m=0;m<size3;m+=3){
-                fread(&c, 1, 1, fp);   // in tis 3 times we put RGB
-                buffer->data[k] = c;   // into the buffer, and let the
-                k += 1;                //4th one eaual 255
-                fread(&c, 1, 1, fp);
-                buffer->data[k] = c;
-                k += 1;
-                fread(&c, 1, 1, fp);
-                buffer->data[k] = c;
-                k += 1;
-                buffer->data[k] = 255;
-                k += 1;
-            }
-            if (k != size2) {
-                fprintf(stderr,"cannot read image datat from file \n");
-                exit(1);
-            }
-        }
-    }
+
     return buffer;
 }
-/**************************************************************************************************************
- **************************************************************************************************************/
-void ImageWrite(Image *buffer, const char *filename,int format){
-    size_t num2;
-    int size = buffer->width * buffer->height * 4;
+void ImageWrite(Image *buffer, const char *filename){
+    int size = buffer->width * buffer->height;
+    //printf("buffer width is %d, buffer height is %d\n",buffer->width,buffer->height);
     FILE *f_des = fopen(filename, "w");
     if (!f_des){
         fprintf(stderr,"cannot open file for writing");
     }
-    if(format==6){
-        fprintf(f_des, "P%d\n%d %d\n%d\n",format,buffer->width, buffer->height, buffer->maxval);
-        for(int i=1; i<size+1;i++){    // for each for slots we skip it,
-            char ch=buffer->data[i-1];
-            if (i%4 !=0) {
-                fwrite(&ch, 1, 1, f_des);  // which means we skip A at here
-            }
-        }
+    unsigned char ch;
+    
+    fprintf(f_des, "P%d\n%d %d\n%d\n",6,buffer->width, buffer->height, buffer->maxval);
+    for(int i=0; i<size;i++){
+        ch=buffer->pixmap[i].r;
+        fwrite(&ch, 1, 1, f_des);
+        ch=buffer->pixmap[i].g;
+        fwrite(&ch, 1, 1, f_des);
+        ch=buffer->pixmap[i].b;
+        fwrite(&ch, 1, 1, f_des);
     }
-    else if(format==3){
-        fprintf(f_des, "P%d\n%d %d\n%d\n",format,buffer->width, buffer->height, buffer->maxval);
-        int i,j;
-        for(i=0;i<buffer->height;i++){
-            for(j=0;j<buffer->width;j++){
-                fprintf(f_des, "%d\n",buffer->data[i*buffer->width*4+4*j]); // We got R and put in to the Buffer
-                fprintf(f_des, "%d\n",buffer->data[i*buffer->width*4+4*j+1]);// We got G and put in to the Buffer
-                fprintf(f_des, "%d\n",buffer->data[i*buffer->width*4+4*j+2]);// We got B and put in to the Buffer
-                //Skip the A
-            }
-            fprintf(f_des, "\n");
-        }
-    }
-    else if(format==7){
-        fprintf(f_des,"P%d\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\nTUPLTYPE %s\nENDHDR\n",format,buffer->width,buffer->height,buffer->depth,buffer->maxval,buffer->tupltype);
-        if (strcmp(buffer->tupltype, "RGB_ALPHA") == 0) {
-            num2 = fwrite((void *) buffer->data, 1, (size_t) size, f_des);// We use fwrite
-        }else if (strcmp(buffer->tupltype, "RGB")==0){
-            for(int i=1; i<size+1;i++){   // for each four slots we skip it
-                char ch=buffer->data[i-1];
-                if (i%4 !=0) {
-                    fwrite(&ch, 1, 1, f_des);
-                }
-            }
-        }
-        fclose(f_des);
-    }
+    
+    fclose(f_des);
+    
+    
 }
-
-/*=============================================================================*/
+/*=============================================================================================*/
+/*==============================Using Dr.Plame's Code as Template=============================*/
+//GLFW Window
 GLFWwindow* window;
 
-/**
- * Vertex Struct
- */
+//Vertex Struct
 typedef struct {
     float position[3];
     float color[4];
     float texcords[2];
 } Vertex;
 
-/**
- * A simple set of vertieces that define a square with correctly mapped texture cords
- */
+//A simple set of vertieces that define a square with correctly mapped texture cords
 const Vertex Vertices[] = {
     {{1, -1, 0}, {1, 1, 1, 1}, {1, 1}},
     {{1, 1, 0}, {1, 1, 1, 1}, {1, 0}},
@@ -284,21 +168,14 @@ const Vertex Vertices[] = {
     {{-1, -1, 0}, {1, 1, 1, 1}, {0, 1}}
 };
 
-/**
- * Specifies the connections between vertices
- */
+//Specifies the connections between vertices
 const GLubyte Indices[] = {
     0, 1, 2,
     2, 3, 0
 };
 
-/**
- * The vertex shader for the applciation, this is where almost all the
- * action happens in reguards to transformations of the image. We simply
- * pass values for Scale, Translation, Shear, and Rotation into here and
- * the shader performs the appropriate matrix operations to transform the
- * displayed underlying geometry.
- */
+
+
 char* vertex_shader_src =
     "attribute vec4 Position;\n"
     "attribute vec4 SourceColor;\n"
@@ -336,10 +213,6 @@ char* vertex_shader_src =
     "}";
 
 
-/**
- * The fragment shader for the application. Handles actually mapping the
- * input image onto the geometry.
- */
 char* fragment_shader_src =
     "varying vec4 DestinationColor;\n"
     "varying vec2 DestinationTexcoord;\n"
@@ -349,14 +222,8 @@ char* fragment_shader_src =
     "    gl_FragColor = texture2D(Texture, DestinationTexcoord) * DestinationColor;\n"
     "}";
 
-/**
- * Compile the specified shader, provides output and checks for errors
- * along the way.
- * @param shader_type - The OpenGL Shader Type
- * @param shader_src - The shader in string form
- * @return The compiled shader id
- */
-GLint simple_shader(GLint shader_type, char* shader_src) {
+
+GLint simple_shader(GLint shader_type, const char* shader_src) {
     GLint compile_success = 0;
     
     // Generate a new shader to work with
@@ -387,10 +254,7 @@ GLint simple_shader(GLint shader_type, char* shader_src) {
     return shader_id;
 }
 
-/**
- * Start the OpenGL program, compile the shaders, and link the program
- * @return
- */
+
 int simple_program() {
     
     GLint link_success = 0;
@@ -421,7 +285,6 @@ int simple_program() {
     
     return program_id;
 }
-
 
 static void error_callback(int error, const char* description) {
     fputs(description, stderr);
@@ -529,7 +392,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
 }
 
-
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     // Scale the image by some portion of the amount scrolled in the Y direction
@@ -542,35 +404,33 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         ScaleTo[1] = 0;
 }
 
-
 void tween(float *currentValues, float *newValues, int totalEntries)
 {
     for (totalEntries--; totalEntries >= 0; totalEntries--)
         currentValues[totalEntries] += (newValues[totalEntries] - currentValues[totalEntries]) * 0.1;
 }
 
-/**
- * The main enchilada, do all the things!
- */
-int main (int argc, char *argv[]) {
-    // Check input arguments
-    if (argc != 2) {
-        fprintf(stderr, "Error: Not enough arguments provided\n");
-        //show_help();
-        return 1;
+
+
+
+int main(int argc, const char * argv[]) {
+    if(argc < 3){
+        perror("We need more arguments");
+        exit(1);//if the nunber is not 0, not access to error
     }
+    else if(argc > 3){
+        perror("Too many arguments");
+        exit(1);//if the nunber is not 0, not access to error
+    }
+    const char *inputName = argv[1];  //input.ppm
+
     
-    // Capture filename to load
-    char *inputFname = argv[1];
-    
-    // Attempt to load the specified image
-    //Image image;
+    Image image;
     /*
-    if (load_image(&image, inputFname) != 0) {
+    if (load_image(&image, inputName) != 0) {
         fprintf(stderr, "An error occurred loading the specified source file.\n");
         exit(1);
-    }
-    */
+    }*/
     // Define GLFW variables
     GLint program_id;
     GLuint color_slot;
@@ -598,7 +458,7 @@ int main (int argc, char *argv[]) {
     
     // Create a fancy window name that has the name of the file being displayed
     char windowName[128];
-    snprintf(windowName, sizeof windowName, "ezview - '%s'", inputFname);
+    snprintf(windowName, sizeof windowName, "ezview - '%s'", inputName);
     
     // Create and open a window
     window = glfwCreateWindow(640,
@@ -652,7 +512,8 @@ int main (int argc, char *argv[]) {
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_FLOAT, image.pixmap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image.width, image.height, 0, GL_RGB, GL_FLOAT, image.pixmap);
     
     glVertexAttribPointer(position_slot,
                           3,
@@ -713,4 +574,12 @@ int main (int argc, char *argv[]) {
     glfwDestroyWindow(window);
     glfwTerminate();
     exit(EXIT_SUCCESS);
+    return 0;
 }
+
+
+
+
+
+
+
