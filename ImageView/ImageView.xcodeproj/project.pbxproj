@@ -8,9 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		F6A3F3151DEE5E1300C37AC8 /* ezview.c in Sources */ = {isa = PBXBuildFile; fileRef = F6A3F3141DEE5E1300C37AC8 /* ezview.c */; };
-		F6A3F31D1DEE5FFD00C37AC8 /* OpenGL.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F6A3F31C1DEE5FFD00C37AC8 /* OpenGL.framework */; };
-		F6A3F31F1DEE607800C37AC8 /* libGLEW.2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F6A3F31E1DEE607800C37AC8 /* libGLEW.2.0.0.dylib */; };
-		F6A3F3231DEE60D000C37AC8 /* libglfw3.3.2.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F6A3F3221DEE60D000C37AC8 /* libglfw3.3.2.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,9 +25,6 @@
 /* Begin PBXFileReference section */
 		F6A3F3111DEE5E1300C37AC8 /* ImageView */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ImageView; sourceTree = BUILT_PRODUCTS_DIR; };
 		F6A3F3141DEE5E1300C37AC8 /* ezview.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ezview.c; sourceTree = "<group>"; };
-		F6A3F31C1DEE5FFD00C37AC8 /* OpenGL.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGL.framework; path = System/Library/Frameworks/OpenGL.framework; sourceTree = SDKROOT; };
-		F6A3F31E1DEE607800C37AC8 /* libGLEW.2.0.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libGLEW.2.0.0.dylib; path = /usr/local/lib/libGLEW.2.0.0.dylib; sourceTree = "<absolute>"; };
-		F6A3F3221DEE60D000C37AC8 /* libglfw3.3.2.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libglfw3.3.2.dylib; path = /usr/local/Cellar/glfw3/3.2.1/lib/libglfw3.3.2.dylib; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -38,9 +32,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F6A3F3231DEE60D000C37AC8 /* libglfw3.3.2.dylib in Frameworks */,
-				F6A3F31F1DEE607800C37AC8 /* libGLEW.2.0.0.dylib in Frameworks */,
-				F6A3F31D1DEE5FFD00C37AC8 /* OpenGL.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,7 +43,6 @@
 			children = (
 				F6A3F3131DEE5E1300C37AC8 /* ImageView */,
 				F6A3F3121DEE5E1300C37AC8 /* Products */,
-				F6A3F31B1DEE5FFD00C37AC8 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -70,16 +60,6 @@
 				F6A3F3141DEE5E1300C37AC8 /* ezview.c */,
 			);
 			path = ImageView;
-			sourceTree = "<group>";
-		};
-		F6A3F31B1DEE5FFD00C37AC8 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				F6A3F31C1DEE5FFD00C37AC8 /* OpenGL.framework */,
-				F6A3F31E1DEE607800C37AC8 /* libGLEW.2.0.0.dylib */,
-				F6A3F3221DEE60D000C37AC8 /* libglfw3.3.2.dylib */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

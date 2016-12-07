@@ -1,6 +1,5 @@
 #ifndef LINMATH_H
 #define LINMATH_H
-
 #include <math.h>
 
 #ifdef _MSC_VER
