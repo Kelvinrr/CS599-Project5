@@ -23,6 +23,6 @@
 
 ************************hint S - Decrease Vertical Shear*********************************
 
-************************hintA - Decrease Horizontal Shear********************************
+************************hin A - Decrease Horizontal Shear********************************
 
-************************hintD - Increase Horizontal Shear*********************************
+************************hint D - Increase Horizontal Shear********************************
