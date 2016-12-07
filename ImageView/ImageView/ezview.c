@@ -51,9 +51,36 @@ static const char* fragment_shader_text =
     "    gl_FragColor = texture2D(Texture, TexCoordOut);\n"
     "}\n";
 /*===============================================================*/
-void read_p3(Pixel *buffer, FILE *input_file, int width, int height);
-void read_p6(Pixel *buffer, FILE *input_file, int width, int height);
+//void read_p3(Pixel *buffer, FILE *input_file, int width, int height);
+//void read_p6(Pixel *buffer, FILE *input_file, int width, int height);
 /*===============================================================*/
+//===============================Code From Project1==================================================//
+void read_p3(Pixel *buffer, FILE *input_file, int width, int height){
+    //fgetc() and atoi() to read and convert ascii
+    int current_read;
+    int red, green, blue;
+    int size = width * height;
+    for(int i = 0; i < size; i++){
+        current_read = fgetc(input_file);
+        while(current_read  == ' ' || current_read  == '\n'){
+            current_read = fgetc(input_file);
+        }
+        ungetc(current_read, input_file);
+        fscanf(input_file, "%d %d %d", &red, &green, &blue);
+        buffer[i].r = red;
+        buffer[i].g = green;
+        buffer[i].b = blue;
+    }
+}
+
+void read_p6(Pixel *buffer, FILE *input_file, int width, int height){
+    int size = width * height;
+    for(int i = 0; i < size; i++){
+        fread(&buffer[i].r, 1, 1, input_file);
+        fread(&buffer[i].g, 1, 1, input_file);
+        fread(&buffer[i].b, 1, 1, input_file);
+    }
+}
 
 static void error_callback(int error, const char* description)
 {
@@ -326,30 +353,5 @@ int main(int argc, char *argv[])
     exit(EXIT_SUCCESS);
 }
 
-//=================================================================================//
-void read_p3(Pixel *buffer, FILE *input_file, int width, int height){
-    //fgetc() and atoi() to read and convert ascii
-    int current_read;
-    int red, green, blue;
-    for(int i = 0; i < width*height; i++){
-        current_read = fgetc(input_file);
-        while(current_read  == ' ' || current_read  == '\n'){ //jumps to first character of first number
-            current_read = fgetc(input_file);
-        }
-        ungetc(current_read, input_file); //since we're now at the beginning of a number, go back one.
-        fscanf(input_file, "%d %d %d", &red, &green, &blue);
-        buffer[i].r = red;
-        buffer[i].g = green;
-        buffer[i].b = blue;
-    }
-}
 
-void read_p6(Pixel *buffer, FILE *input_file, int width, int height){
-    //reading each pixel into memory for a P6 image
-    for(int i = 0; i < width*height; i++){
-        fread(&buffer[i].r, 1, 1, input_file);
-        fread(&buffer[i].g, 1, 1, input_file);
-        fread(&buffer[i].b, 1, 1, input_file);
-    }
-}
 
